@@ -1,5 +1,3 @@
-
-
 use std::io::{self, Write};
 
 use colored::*;
@@ -9,6 +7,7 @@ use serde::Deserialize;
 pub struct WeatherResponse {
     location: Location,
     current: Current,
+    forecast: Forecast,
 }
 
 #[derive(Deserialize, Debug)]
@@ -35,9 +34,29 @@ struct Condition {
     text: String,
 }
 
-pub fn get_weather_data(api_key: &str, location: &str) -> Result<WeatherResponse, reqwest::Error> {
+#[derive(Deserialize, Debug)]
+struct Forecast {
+    forecastday: Vec<Day>,
+}
+#[derive(Deserialize, Debug)]
+struct Day {
+    date: String,
+    day: DayConditions,
+}
+#[derive(Deserialize, Debug)]
+struct DayConditions {
+    maxtemp_f: f64,
+    mintemp_f: f64,
+    daily_chance_of_rain: i64,
+}
+
+pub fn get_weather_data(
+    api_key: &str,
+    location: &str,
+    num_days: u8,
+) -> Result<WeatherResponse, reqwest::Error> {
     let request = format!(
-        "http://api.weatherapi.com/v1/forecast.json?key={}&q={}",
+        "http://api.weatherapi.com/v1/forecast.json?key={}&q={}&days={num_days}",
         api_key, location
     );
     let response = reqwest::blocking::get(request)?;
@@ -47,24 +66,39 @@ pub fn get_weather_data(api_key: &str, location: &str) -> Result<WeatherResponse
 }
 
 pub fn display_weather(response: &WeatherResponse) {
-    let temperature_colorized = colorized_temp(response.current.temp_f);
-
     let weather_text = format!(
-        "Weather for: {}, {} {}
+        "Current Weather for: {}, {}, {}
 > Temperature: {}°F
 > Feels like: {}°F
 > Humidity: {:.1}%
-> Current Conditions: {}",
+> Current Conditions: {}\n",
         response.location.name,
         response.location.region,
         response.location.country,
-        temperature_colorized,
-        response.current.feelslike_f,
+        colorized_temp(response.current.temp_f),
+        colorized_temp(response.current.feelslike_f),
         response.current.humidity,
-        response.current.condition.text
+        response.current.condition.text,
     );
-    let weather_text_colored = weather_text;
-    println!("{}", weather_text_colored);
+    println!("{}", weather_text);
+
+    for day in &response.forecast.forecastday {
+        print_daily_forecast(day);
+    }
+}
+
+fn print_daily_forecast(day: &Day) {
+    let weather_text = format!(
+        "Daily Weather for {}:
+> High of {}°F
+> Low of {}°F
+> Chance of rain: {}%\n",
+        day.date,
+        colorized_temp(day.day.maxtemp_f),
+        colorized_temp(day.day.mintemp_f),
+        day.day.daily_chance_of_rain
+    );
+    println!("{}", weather_text);
 }
 
 fn colorized_temp(temperature: f64) -> ColoredString {
@@ -73,8 +107,12 @@ fn colorized_temp(temperature: f64) -> ColoredString {
     match temperature {
         ..=0.0 => temperature_colorized = format!("{:.1}", temperature).to_string().blue().bold(),
         32.0..=50.0 => temperature_colorized = format!("{:.1}", temperature).bright_blue().bold(),
-        50.0..=70.0 => temperature_colorized = format!("{:.1}", temperature).truecolor(255, 255, 0).bold(), //yellow
-        70.0..=80.0 => temperature_colorized = format!("{:.1}", temperature).truecolor(255, 165, 0).bold(), //orange
+        50.0..=70.0 => {
+            temperature_colorized = format!("{:.1}", temperature).truecolor(255, 255, 0).bold()
+        } //yellow
+        70.0..=80.0 => {
+            temperature_colorized = format!("{:.1}", temperature).truecolor(255, 165, 0).bold()
+        } //orange
         _ => temperature_colorized = format!("{:.1}", temperature).red().bold(),
     }
 

@@ -3,21 +3,21 @@ use std::io::{self, Write};
 use colored::*;
 use serde::Deserialize;
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct WeatherResponse {
     location: Location,
     current: Current,
     forecast: Forecast,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 struct Location {
     name: String,
     region: String,
     country: String,
     localtime: String,
 }
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 struct Current {
     temp_f: f64,
     feelslike_f: f64,
@@ -29,21 +29,21 @@ struct Current {
     vis_miles: f64,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 struct Condition {
     text: String,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 struct Forecast {
     forecastday: Vec<Day>,
 }
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 struct Day {
     date: String,
     day: DayConditions,
 }
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone, Copy)]
 struct DayConditions {
     maxtemp_f: f64,
     mintemp_f: f64,
@@ -83,16 +83,18 @@ pub fn display_weather(response: &WeatherResponse) {
     println!("{}", weather_text);
 
     for day in &response.forecast.forecastday {
-        print_daily_forecast(day);
+        print_daily_forecast(day, response.location.clone());
     }
 }
 
-fn print_daily_forecast(day: &Day) {
+fn print_daily_forecast(day: &Day, location: Location) {
     let weather_text = format!(
-        "Daily Weather for {}:
+        "Daily Weather for {}, {} on {}:
 > High of {}°F
 > Low of {}°F
 > Chance of rain: {}%\n",
+        location.name,
+        location.region,
         day.date,
         colorized_temp(day.day.maxtemp_f),
         colorized_temp(day.day.mintemp_f),
